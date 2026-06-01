@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.log
+products/
+src/run_local.bat
+src/debug_direct.py
+src/debug_server.py
+src/srv.log

@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>餐饮文案助手 - 10秒出5条朋友圈文案</title>
+    <meta name="description" content="餐饮老板的朋友圈文案生成工具，点3下出5条文案，复制即用。">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#FF6B35',
+                        primaryDark: '#E55A2B',
+                        secondary: '#FFB800',
+                        bg: '#FFF8F0',
+                        card: '#FFFFFF',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif; }
+
+        /* 品类/场景卡片选中态 */
+        .card-selectable { transition: all 0.2s ease; cursor: pointer; }
+        .card-selectable:active { transform: scale(0.96); }
+        .card-selected { background-color: #FF6B35 !important; color: white !important; border-color: #FF6B35 !important; }
+        .card-selected .card-sub { color: rgba(255,255,255,0.8) !important; }
+
+        /* 生成按钮脉冲 */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,53,0.4); }
+            50% { box-shadow: 0 0 0 12px rgba(255,107,53,0); }
+        }
+        .btn-pulse { animation: pulse-glow 2s infinite; }
+
+        /* loading点点点 */
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        .loading-dots::after { content: '.'; animation: dots 1.5s infinite; }
+
+        /* 复制成功动画 */
+        .copy-success { background-color: #22c55e !important; }
+
+        /* 淡入 */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.4s ease forwards; }
+
+        /* 平滑滚动 */
+        html { scroll-behavior: smooth; }
+    </style>
+</head>
+<body class="bg-bg min-h-screen">
+
+<!-- ==================== 区域A：首屏 ==================== -->
+<section id="hero" class="bg-gradient-to-br from-primary via-primary to-secondary text-white pt-10 pb-12 px-5 text-center">
+    <div class="text-4xl mb-3">🍜</div>
+    <h1 class="text-2xl font-bold mb-2">餐饮文案助手</h1>
+    <p class="text-base opacity-90 mb-6">每天花20分钟想朋友圈文案？<br>这里10秒搞定。</p>
+
+    <!-- 效果对比 -->
+    <div class="flex gap-3 max-w-sm mx-auto mb-6 text-left">
+        <div class="flex-1 bg-white/15 rounded-xl p-3">
+            <div class="text-xs opacity-70 mb-1">❌ 自己写</div>
+            <div class="text-sm leading-relaxed">"今日营业，欢迎光临"</div>
+            <div class="text-xs opacity-60 mt-1">20分钟 · 3个赞</div>
+        </div>
+        <div class="flex-1 bg-white/25 rounded-xl p-3">
+            <div class="text-xs opacity-70 mb-1">✅ 这里生成</div>
+            <div class="text-sm leading-relaxed">"下雨天就该来碗热汤面🍜 招牌牛肉面特价18元…"</div>
+            <div class="text-xs opacity-60 mt-1">10秒 · 效果翻倍</div>
+        </div>
+    </div>
+
+    <a href="#generator" class="inline-block bg-white text-primary font-bold px-8 py-3 rounded-full text-base shadow-lg hover:shadow-xl transition-shadow">
+        👇 免费体验
+    </a>
+</section>
+
+<!-- ==================== 区域B：使用区 ==================== -->
+<section id="generator" class="px-4 py-8 max-w-lg mx-auto">
+
+    <!-- 第①步：选品类 -->
+    <div id="step1" class="mb-6">
+        <h2 class="text-lg font-bold text-gray-800 mb-1">第①步：你做什么生意？</h2>
+        <p class="text-sm text-gray-400 mb-3">点击选择</p>
+        <div id="categoryGrid" class="grid grid-cols-4 gap-2">
+            <!-- JS动态生成 -->
+        </div>
+    </div>
+
+    <!-- 第②步：选场景 -->
+    <div id="step2" class="mb-6 hidden">
+        <h2 class="text-lg font-bold text-gray-800 mb-1">第②步：今天想发什么？</h2>
+        <p class="text-sm text-gray-400 mb-3">选一个场景</p>
+
+        <div class="mb-3">
+            <div class="text-xs text-gray-400 font-medium mb-2">📱 朋友圈文案</div>
+            <div id="sceneGridMoments" class="grid grid-cols-3 gap-2"></div>
+        </div>
+        <div>
+            <div class="text-xs text-gray-400 font-medium mb-2">📦 外卖平台文案</div>
+            <div id="sceneGridTakeaway" class="grid grid-cols-3 gap-2"></div>
+        </div>
+    </div>
+
+    <!-- 第③步：补充信息 + 生成 -->
+    <div id="step3" class="mb-6 hidden">
+        <h2 class="text-lg font-bold text-gray-800 mb-1">第③步：补充信息</h2>
+        <p class="text-sm text-gray-400 mb-3">填一下效果更好（部分选填）</p>
+
+        <div id="inputFields" class="space-y-3 mb-5">
+            <!-- JS动态生成 -->
+        </div>
+
+        <!-- 文案长度选择 -->
+        <div id="lengthSection" class="mb-5 hidden">
+            <label class="block text-sm font-medium text-gray-600 mb-2">文案长度</label>
+            <div id="lengthGrid" class="grid grid-cols-3 gap-2">
+                <!-- JS动态生成 -->
+            </div>
+            <div id="costHint" class="text-xs text-gray-400 mt-2 text-center">
+                消耗 <span id="costCount">1</span> 次免费额度
+            </div>
+        </div>
+
+        <!-- 剩余次数 -->
+        <div id="usageHint" class="text-center text-sm text-gray-400 mb-3">
+            ⭐ 今日剩余 <span id="remainingCount">5</span> 次额度
+        </div>
+
+        <!-- 生成按钮 -->
+        <button id="generateBtn" onclick="handleGenerate()"
+                class="w-full bg-primary text-white font-bold py-4 rounded-2xl text-lg shadow-lg btn-pulse hover:bg-primaryDark active:scale-95 transition-all">
+            🚀 一键生成文案
+        </button>
+    </div>
+</section>
+
+<!-- ==================== 区域C：结果区 ==================== -->
+<section id="results" class="px-4 py-6 max-w-lg mx-auto hidden">
+    <h2 class="text-lg font-bold text-gray-800 mb-4">📋 生成结果</h2>
+    <div id="copyList" class="space-y-3 mb-5">
+        <!-- JS动态生成 -->
+    </div>
+    <div class="flex gap-3">
+        <button onclick="handleRegenerate()" class="flex-1 bg-gray-100 text-gray-600 font-medium py-3 rounded-xl hover:bg-gray-200 transition-colors">
+            🔄 换一批
+        </button>
+    </div>
+</section>
+
+<!-- ==================== 次数用完提示 ==================== -->
+<section id="limitReached" class="px-4 py-6 max-w-lg mx-auto hidden">
+    <div class="bg-gradient-to-br from-secondary/20 to-primary/10 rounded-2xl p-6 text-center">
+        <div class="text-3xl mb-3">⭐</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">今日免费次数已用完</h3>
+        <p class="text-sm text-gray-500 mb-4">明天还有5次免费额度～<br>坚持每天来用，省钱又省心！</p>
+        <div class="bg-white rounded-xl p-4 text-left text-sm text-gray-600 space-y-1">
+            <p>💡 <strong>小提示</strong>：选"简单"模式最省次数（1次），长篇需要3次～</p>
+            <p>👆 或者明天再来，每天5次免费额度重置。</p>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== 区域D：底部 ==================== -->
+<section class="px-4 py-8 max-w-lg mx-auto border-t border-gray-100">
+
+    <!-- 为什么有效 -->
+    <div class="mb-8">
+        <h3 class="text-base font-bold text-gray-800 mb-3">💡 为什么比自己写好？</h3>
+        <div class="space-y-2 text-sm text-gray-600">
+            <div class="flex items-start gap-2">
+                <span class="text-primary mt-0.5">✓</span>
+                <span><strong>有画面感</strong>："炖了3小时的红烧肉"比"今日红烧肉"强10倍</span>
+            </div>
+            <div class="flex items-start gap-2">
+                <span class="text-primary mt-0.5">✓</span>
+                <span><strong>有紧迫感</strong>："限50份"让人赶快来，"欢迎光临"没人理</span>
+            </div>
+            <div class="flex items-start gap-2">
+                <span class="text-primary mt-0.5">✓</span>
+                <span><strong>有互动</strong>：带提问/暗号/福利，评论区自然活跃</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="mb-8">
+        <h3 class="text-base font-bold text-gray-800 mb-3">❓ 常见问题</h3>
+        <div class="space-y-3 text-sm">
+            <div class="bg-gray-50 rounded-xl p-3">
+                <div class="font-medium text-gray-700 mb-1">Q：这个工具免费吗？</div>
+                <div class="text-gray-500">每天免费5次，日常发圈完全够用。</div>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-3">
+                <div class="font-medium text-gray-700 mb-1">Q：我不会用AI，能用这个吗？</div>
+                <div class="text-gray-500">不需要你会。点3下就行，比发朋友圈还简单。</div>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-3">
+                <div class="font-medium text-gray-700 mb-1">Q：文案会不会跟别人重复？</div>
+                <div class="text-gray-500">每次生成都是全新的，不会重复。</div>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-3">
+                <div class="font-medium text-gray-700 mb-1">Q：手机上能用吗？</div>
+                <div class="text-gray-500">专门做了手机适配，体验最好。建议添加到主屏幕。</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部版权 -->
+    <div class="text-center text-xs text-gray-300 pt-4 pb-8">
+        餐饮文案助手 · 让每一家小店都会发朋友圈
+    </div>
+</section>
+
+<!-- ==================== JavaScript ==================== -->
+<script>
+// ============================================================
+// 全局状态
+// ============================================================
+const state = {
+    categories: [],
+    scenes: [],
+    lengths: {},
+    selectedCategory: null,
+    selectedScene: null,
+    selectedLength: 'short',
+    loading: false,
+    results: [],
+};
+
+// ============================================================
+// 初始化
+// ============================================================
+document.addEventListener('DOMContentLoaded', async () => {
+    checkUsageLimit();
+    await loadData();
+    renderCategories();
+});
+
+async function loadData() {
+    try {
+        const [catRes, sceneRes, lenRes] = await Promise.all([
+            fetch('/api/categories').then(r => r.json()),
+            fetch('/api/scenes').then(r => r.json()),
+            fetch('/api/lengths').then(r => r.json()),
+        ]);
+        if (catRes.success) state.categories = catRes.categories;
+        if (sceneRes.success) state.scenes = sceneRes.scenes;
+        if (lenRes.success) state.lengths = lenRes.lengths;
+    } catch (e) {
+        console.error('加载数据失败', e);
+    }
+}
+
+// ============================================================
+// 渲染品类卡片
+// ============================================================
+function renderCategories() {
+    const grid = document.getElementById('categoryGrid');
+    grid.innerHTML = state.categories.map(c => `
+        <div class="card-selectable bg-white border-2 border-gray-100 rounded-xl p-3 text-center"
+             data-id="${c.id}" onclick="selectCategory('${c.id}')">
+            <div class="text-2xl mb-1">${c.icon}</div>
+            <div class="text-xs text-gray-700 font-medium">${c.name}</div>
+        </div>
+    `).join('');
+}
+
+// ============================================================
+// 选择品类
+// ============================================================
+function selectCategory(id) {
+    state.selectedCategory = id;
+    state.selectedScene = null;
+
+    // 高亮
+    document.querySelectorAll('#categoryGrid .card-selectable').forEach(el => {
+        el.classList.toggle('card-selected', el.dataset.id === id);
+    });
+
+    // 显示步骤2
+    renderScenes();
+    document.getElementById('step2').classList.remove('hidden');
+    document.getElementById('step3').classList.add('hidden');
+    document.getElementById('results').classList.add('hidden');
+
+    // 平滑滚动
+    setTimeout(() => document.getElementById('step2').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
+// ============================================================
+// 渲染场景卡片
+// ============================================================
+function renderScenes() {
+    const moments = state.scenes.filter(s => s.group === '朋友圈');
+    const takeaway = state.scenes.filter(s => s.group === '外卖');
+
+    document.getElementById('sceneGridMoments').innerHTML = moments.map(s => `
+        <div class="card-selectable bg-white border-2 border-gray-100 rounded-xl p-2.5 text-center"
+             data-id="${s.id}" onclick="selectScene('${s.id}')">
+            <div class="text-xl mb-0.5">${s.icon}</div>
+            <div class="text-xs text-gray-700 font-medium">${s.name}</div>
+        </div>
+    `).join('');
+
+    document.getElementById('sceneGridTakeaway').innerHTML = takeaway.map(s => `
+        <div class="card-selectable bg-white border-2 border-gray-100 rounded-xl p-2.5 text-center"
+             data-id="${s.id}" onclick="selectScene('${s.id}')">
+            <div class="text-xl mb-0.5">${s.icon}</div>
+            <div class="text-xs text-gray-700 font-medium">${s.name}</div>
+        </div>
+    `).join('');
+}
+
+// ============================================================
+// 选择场景
+// ============================================================
+function selectScene(id) {
+    state.selectedScene = id;
+
+    // 高亮（所有场景卡片）
+    document.querySelectorAll('#step2 .card-selectable').forEach(el => {
+        el.classList.toggle('card-selected', el.dataset.id === id);
+    });
+
+    // 渲染输入字段
+    renderInputFields();
+
+    document.getElementById('step3').classList.remove('hidden');
+    document.getElementById('results').classList.add('hidden');
+
+    setTimeout(() => document.getElementById('step3').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
+// ============================================================
+// 渲染输入字段
+// ============================================================
+function renderInputFields() {
+    const scene = state.scenes.find(s => s.id === state.selectedScene);
+    if (!scene) return;
+
+    const container = document.getElementById('inputFields');
+    container.innerHTML = scene.fields.map(f => `
+        <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">
+                ${f.label}${f.required ? ' <span class="text-red-400">*</span>' : ''}
+            </label>
+            <input type="text"
+                   id="field_${f.key}"
+                   placeholder="${f.placeholder}"
+                   class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-base focus:border-primary focus:outline-none transition-colors">
+        </div>
+    `).join('');
+
+    // 渲染长度选择
+    renderLengthSelector();
+}
+
+// ============================================================
+// 渲染长度选择
+// ============================================================
+function renderLengthSelector() {
+    const lengthKeys = Object.keys(state.lengths);
+    if (!lengthKeys.length) return;
+
+    document.getElementById('lengthSection').classList.remove('hidden');
+    if (!state.selectedLength) state.selectedLength = 'short';
+
+    const grid = document.getElementById('lengthGrid');
+    grid.innerHTML = lengthKeys.map(k => {
+        const l = state.lengths[k];
+        const selected = state.selectedLength === k;
+        return `
+            <div class="card-selectable bg-white border-2 rounded-xl p-3 text-center ${selected ? 'card-selected' : 'border-gray-100'}"
+                 data-length="${k}" onclick="selectLength('${k}')">
+                <div class="text-xs font-medium">${l.name}</div>
+                <div class="text-xs ${selected ? 'text-white/80' : 'text-gray-400'} mt-0.5">x${l.consumes}</div>
+            </div>
+        `;
+    }).join('');
+
+    updateCostHint();
+}
+
+// ============================================================
+// 选择长度
+// ============================================================
+function selectLength(key) {
+    state.selectedLength = key;
+
+    document.querySelectorAll('#lengthGrid .card-selectable').forEach(el => {
+        el.classList.toggle('card-selected', el.dataset.length === key);
+    });
+
+    updateCostHint();
+    updateRemainingDisplay();
+}
+
+function updateCostHint() {
+    const cfg = state.lengths[state.selectedLength];
+    if (!cfg) return;
+    document.getElementById('costCount').textContent = cfg.consumes || 1;
+}
+
+function updateRemainingDisplay() {
+    checkUsageLimit(); // updates the DOM inside that function
+}
+
+// ============================================================
+// 生成文案（核心）
+// ============================================================
+async function handleGenerate() {
+    if (state.loading) return;
+
+    // 检查免费限制
+    const limit = checkUsageLimit();
+    if (!limit.allowed) {
+        showLimitReached();
+        return;
+    }
+
+    // 收集参数
+    const params = {};
+    const scene = state.scenes.find(s => s.id === state.selectedScene);
+    if (scene) {
+        for (const field of scene.fields) {
+            const el = document.getElementById('field_' + field.key);
+            params[field.key] = el ? el.value.trim() : '';
+        }
+    }
+
+    // 开始加载
+    state.loading = true;
+    const btn = document.getElementById('generateBtn');
+    btn.innerHTML = '<span class="loading-dots">AI正在创作</span>';
+    btn.disabled = true;
+    btn.classList.remove('btn-pulse');
+
+    try {
+        const res = await fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                category: state.selectedCategory,
+                scene: state.selectedScene,
+                length: state.selectedLength,
+                params: params,
+            }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            state.results = data.copies;
+            renderResults();
+            // 按长度扣减次数
+            const cost = (state.lengths[state.selectedLength] || {}).consumes || 1;
+            incrementUsage(cost);
+            checkUsageLimit();
+        } else {
+            alert(data.error || '生成失败，请重试');
+        }
+    } catch (e) {
+        alert('网络错误，请检查网络后重试');
+    } finally {
+        state.loading = false;
+        btn.innerHTML = '🚀 一键生成文案';
+        btn.disabled = false;
+        btn.classList.add('btn-pulse');
+    }
+}
+
+// ============================================================
+// 渲染结果
+// ============================================================
+function renderResults() {
+    const container = document.getElementById('copyList');
+    container.innerHTML = state.results.map((c, i) => `
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm fade-up" style="animation-delay: ${i * 0.1}s">
+            <div class="text-sm text-gray-800 leading-relaxed mb-3 whitespace-pre-wrap">${escapeHtml(c.text)}</div>
+            <div class="flex justify-end">
+                <button onclick="copyText(this, ${c.id})"
+                        class="bg-primary/10 text-primary text-sm font-medium px-4 py-1.5 rounded-lg hover:bg-primary/20 transition-colors copy-btn">
+                    📋 复制
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    document.getElementById('results').classList.remove('hidden');
+    setTimeout(() => document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
+// ============================================================
+// 复制文案
+// ============================================================
+function copyText(btn, id) {
+    const item = state.results.find(c => c.id === id);
+    if (!item) return;
+
+    navigator.clipboard.writeText(item.text).then(() => {
+        btn.classList.add('copy-success');
+        btn.innerHTML = '✅ 已复制';
+        setTimeout(() => {
+            btn.classList.remove('copy-success');
+            btn.innerHTML = '📋 复制';
+        }, 2000);
+    }).catch(() => {
+        // fallback：选中文本
+        const ta = document.createElement('textarea');
+        ta.value = item.text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.innerHTML = '✅ 已复制';
+        setTimeout(() => btn.innerHTML = '📋 复制', 2000);
+    });
+}
+
+// ============================================================
+// 换一批
+// ============================================================
+function handleRegenerate() {
+    handleGenerate();
+}
+
+// ============================================================
+// 免费限制（localStorage）
+// ============================================================
+function checkUsageLimit() {
+    const today = new Date().toISOString().split('T')[0];
+    let data = {};
+    try { data = JSON.parse(localStorage.getItem('cw_usage') || '{}'); } catch(e) {}
+
+    if (data.date !== today) {
+        data = { date: today, count: 0 };
+        localStorage.setItem('cw_usage', JSON.stringify(data));
+    }
+
+    const used = data.count || 0;
+    const rawRemaining = Math.max(0, 5 - used);
+    const cfg = state.lengths[state.selectedLength] || { consumes: 1 };
+    const cost = cfg.consumes || 1;
+    const effectiveRemaining = Math.floor(rawRemaining / cost);
+
+    document.getElementById('remainingCount').textContent = rawRemaining;
+
+    return { allowed: effectiveRemaining > 0, remaining: rawRemaining, effective: effectiveRemaining };
+}
+
+function incrementUsage(cost) {
+    const today = new Date().toISOString().split('T')[0];
+    let data = {};
+    try { data = JSON.parse(localStorage.getItem('cw_usage') || '{}'); } catch(e) {}
+    if (data.date !== today) data = { date: today, count: 0 };
+    data.count = (data.count || 0) + (cost || 1);
+    localStorage.setItem('cw_usage', JSON.stringify(data));
+}
+
+function showLimitReached() {
+    document.getElementById('step3').classList.add('hidden');
+    document.getElementById('results').classList.add('hidden');
+    document.getElementById('limitReached').classList.remove('hidden');
+    document.getElementById('limitReached').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ============================================================
+// 工具函数
+// ============================================================
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+</script>
+
+</body>
+</html>
